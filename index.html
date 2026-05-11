@@ -188,12 +188,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
     </div>
   </div>
 </div>
-<div class="import-zone" id="importZone">
-  <div class="import-dot" id="importDot"></div>
-  <span class="import-label" id="importLabel">Drag a CSV file to update the calendar</span>
-  <button class="import-btn" onclick="document.getElementById('fileInput').click()">Choose file</button>
-  <input type="file" id="fileInput" class="import-input" accept=".csv" onchange="handleFile(this.files[0])">
-</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -276,6 +271,8 @@ const EVENTS = [
   { id:40,  title:'2027 Ozwater Conference',                                       cat:'conference', date:'2027-05-04', duration:'3 days', recurrence:12 },
   { id:41,  title:'2027 Performance Development Plan review',                      cat:'mentoring',  date:'2027-06-30', duration:'', recurrence:12 },
   { id:42,  title:'2028 Performance Development Plan setup',                       cat:'mentoring',  date:'2027-07-31', duration:'', recurrence:12 },
+  { id:43,  title:'2027 Performance Development Plan mid-year review',             cat:'mentoring',  date:'2026-12-31', duration:'', recurrence:12 },
+  { id:44,  title:'2028 Performance Development Plan mid-year review',             cat:'mentoring',  date:'2027-12-31', duration:'', recurrence:12 },
 ];
 /* ════════════════════════════════════════════════════
    END CONFIG
@@ -316,10 +313,17 @@ function generateProjected(){
     if(!months) return;
     const next=addMonths(base.dateObj,months);
     const isPast=next<=now;
-    if(isPast && base.cat!=='conference') return;  // past TBC: hide unless conference
+    if(isPast && base.cat!=='conference') return;
     const dateStr=fmtISO(next);
     const key=base.title+'|'+dateStr;
-    if(seen.has(key)) return;          // already exists as real event
+    if(seen.has(key)) return; // exact match
+    // suppress TBC if same title exists within +/- 1 month
+    const tooClose=EVENTS.some(e=>{
+      if(e.title!==base.title) return false;
+      const diff=Math.abs(next-e.dateObj);
+      return diff <= 31*24*60*60*1000; // 31 days in ms
+    });
+    if(tooClose) return;
     seen.add(key);
     projected.push({
       id:pid++, title:base.title, cat:base.cat,
