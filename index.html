@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MHL Knowledge Events Calendar</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#f5f4f0;--surface:#fff;--border:rgba(0,0,0,0.09);
+  --text:#1a1a18;--text2:#5a5a56;--text3:#9a9a94;--accent:#1a4f8a;--accent-l:#eef4fb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;z-index:50}
+.logo{font-size:15px;font-weight:600;letter-spacing:-.02em}.logo span{color:var(--accent)}
+.view-tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.vtab{background:transparent;border:none;border-radius:6px;color:var(--text3);font-family:inherit;font-size:12px;font-weight:500;padding:4px 11px;cursor:pointer;transition:all .15s}
+.vtab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.app{display:grid;grid-template-columns:1fr 360px;flex:1;overflow:hidden;transition:grid-template-columns .25s ease}
+.cal-pane{display:flex;flex-direction:column;overflow:hidden;padding:20px 20px 0}
+.toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;flex-shrink:0}
+.nav-group{display:flex;align-items:center;gap:6px}
+.period-label{font-size:19px;font-weight:600;letter-spacing:-.03em;min-width:180px}
+.btn{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:inherit;font-size:12px;padding:5px 11px;cursor:pointer;transition:background .12s}
+.btn:hover{background:var(--bg)}
+.filter-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;flex-shrink:0;align-items:center}
+.flabel{font-size:11px;color:var(--text3);margin-right:2px}
+.fbtn{background:var(--surface);border:1px solid var(--border);border-radius:20px;color:var(--text2);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;transition:all .15s}
+.fbtn.on{font-weight:500}
+.cal-surface{background:var(--surface);border:1px solid var(--border);border-radius:12px 12px 0 0;overflow-y:auto;flex:1}
+/* YEAR */
+.year-row{display:grid;grid-template-columns:46px 1fr;border-bottom:1px solid var(--border);min-height:34px;align-items:start}
+.year-row:last-child{border-bottom:none}
+.yr-ml{font-size:10px;font-weight:500;color:var(--text3);padding:8px 6px 8px 14px;font-family:'DM Mono',monospace;letter-spacing:.04em}
+.yr-lane{display:flex;flex-wrap:wrap;gap:3px;padding:5px 8px 5px 0;align-items:flex-start}
+/* MONTH */
+.dow-row{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);background:var(--bg)}
+.dow{text-align:center;font-size:10px;font-weight:500;color:var(--text3);padding:6px 0;font-family:'DM Mono',monospace;letter-spacing:.05em}
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.day-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:76px;padding:5px;overflow:visible}
+.day-cell:nth-child(7n){border-right:none}
+.day-cell.other{background:var(--bg);opacity:.55}
+.day-num{font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;margin-bottom:2px}
+.day-num.today{background:var(--accent);color:#fff}
+/* WEEK */
+.week-wrap{overflow-x:auto}
+.wk-header{display:grid;grid-template-columns:48px repeat(7,1fr);min-width:500px;border-bottom:1px solid var(--border);background:var(--bg)}
+.wk-head{text-align:center;font-size:10px;color:var(--text3);padding:8px 2px;font-family:'DM Mono',monospace;font-weight:500}
+.wk-head.tc{color:var(--accent);font-weight:600}
+.wk-body{display:grid;grid-template-columns:48px repeat(7,1fr);min-width:500px;position:relative}
+.wk-col-label{font-size:9px;color:var(--text3);padding:6px 4px 0;text-align:right;font-family:'DM Mono',monospace;border-right:1px solid var(--border)}
+.wk-col{border-right:1px solid var(--border);min-height:120px;position:relative;padding:4px 3px;display:flex;flex-direction:column;gap:3px}
+.wk-col:last-child{border-right:none}
+.wk-ev{border-radius:4px;padding:3px 6px;font-size:10px;cursor:pointer;display:block;white-space:normal;word-break:break-word;line-height:1.35;transition:opacity .12s}
+.wk-ev:hover{opacity:.75}
+.wk-ev.hl{outline:2px solid var(--accent);outline-offset:1px}
+.wk-span-bar{border-radius:4px;padding:3px 6px;font-size:10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;transition:opacity .12s;position:absolute;z-index:2;box-sizing:border-box}
+.wk-span-bar:hover{opacity:.75}
+.wk-span-bar.hl{outline:2px solid var(--accent);outline-offset:1px}
+/* CATEGORY */
+.cat-sec{border-bottom:1px solid var(--border)}
+.cat-sec:last-child{border-bottom:none}
+.cat-hdr{display:flex;align-items:center;gap:7px;padding:9px 14px;font-size:12px;font-weight:600}
+.cat-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.cat-count{font-size:11px;font-weight:400;color:var(--text3)}
+.cat-evs{padding:0 14px 8px 30px}
+.cat-ev{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.cat-ev:last-child{border-bottom:none}
+.cat-ev:hover .cat-t{color:var(--accent)}
+.cat-d{font-size:10px;color:var(--text3);min-width:54px;font-family:'DM Mono',monospace}
+.cat-t{font-size:12px;color:var(--text)}
+.cat-dur{font-size:10px;color:var(--text3);margin-left:auto}
+/* CHIP */
+.ev-chip{display:block;border-radius:4px;padding:2px 6px;font-size:10px;line-height:1.4;cursor:pointer;white-space:normal;word-break:break-word;margin-bottom:2px;transition:opacity .12s}
+.ev-chip:hover{opacity:.75}
+.ev-chip.hl{outline:2px solid var(--accent);outline-offset:1px}
+.ev-bar{border-radius:4px;padding:1px 5px;font-size:10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;position:absolute;z-index:2}
+.ev-bar:hover{opacity:.75}
+.ev-bar.hl{outline:2px solid var(--accent);outline-offset:1px}
+/* TBC style — lighter opacity only, no hatch */
+.tbc-chip{opacity:0.45}
+.tbc-label{font-size:9px;font-weight:600;margin-right:3px;letter-spacing:.02em}
+/* LIST PANE */
+.list-pane{border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;transition:all .25s ease;min-width:0}
+.list-collapsed-btn{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px 0;cursor:pointer;height:100%;border:none;background:transparent;width:100%}
+.list-collapsed-btn:hover{background:var(--bg)}
+.list-collapsed-label{font-size:10px;color:var(--text3);writing-mode:vertical-rl;letter-spacing:.06em;font-weight:500}
+.list-top{padding:14px 18px 0;flex-shrink:0}
+.list-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.list-title-row{display:flex;align-items:center;gap:8px}
+.list-title{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.list-count{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.sync-label{font-size:10px;color:var(--text3)}
+.search-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px;padding:6px 10px;outline:none;transition:border-color .15s;margin-bottom:10px}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--text3)}
+.list-cols{display:grid;grid-template-columns:1fr 64px 84px;padding:5px 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.col-h{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase}
+.list-rows{overflow-y:auto;flex:1}
+.list-row{display:grid;grid-template-columns:1fr 64px 84px;padding:8px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;align-items:center}
+.list-row:last-child{border-bottom:none}
+.list-row:hover{background:var(--bg)}
+.list-row.sel{background:var(--accent-l)}
+.lr-title{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+.lr-date{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+.lr-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;white-space:nowrap}
+.detail-panel{border-top:1px solid var(--border);padding:14px 18px;flex-shrink:0;display:none;background:var(--accent-l)}
+.detail-panel.open{display:block}
+.det-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.det-title{font-size:13px;font-weight:600;line-height:1.4;padding-right:6px;color:var(--text)}
+.det-close{background:none;border:none;font-size:16px;color:var(--text3);cursor:pointer}
+.det-close:hover{color:var(--text)}
+.det-badge{display:inline-block;font-size:10px;padding:2px 9px;border-radius:9px;margin-bottom:8px}
+.det-row{display:flex;gap:6px;margin-bottom:4px;font-size:12px}
+.det-lbl{color:var(--text3);min-width:58px;flex-shrink:0;font-size:10px;font-family:'DM Mono',monospace;padding-top:1px}
+.det-val{color:var(--text)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;padding:10px 18px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.empty{padding:28px;text-align:center;font-size:12px;color:var(--text3)}
+
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;font-size:12px;padding:8px 16px;border-radius:8px;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">MHL <span>Knowledge Calendar</span></div>
+  <div class="view-tabs">
+    <button class="vtab active" onclick="setView('year',this)">Year</button>
+    <button class="vtab" onclick="setView('month',this)">Month</button>
+    <button class="vtab" onclick="setView('week',this)">Week</button>
+    <button class="vtab" onclick="setView('category',this)">Category</button>
+  </div>
+</header>
+<div class="app" id="app">
+  <div class="cal-pane">
+    <div class="toolbar">
+      <div class="nav-group">
+        <button class="btn" onclick="navPrev()">&#8592;</button>
+        <div class="period-label" id="periodLabel"></div>
+        <button class="btn" onclick="navNext()">&#8594;</button>
+        <button class="btn" onclick="goToday()" style="color:var(--text3);font-size:11px">Today</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="flabel">Filter:</span>
+      <button class="fbtn on" id="fall" onclick="toggleAll()">All</button>
+    </div>
+    <div class="cal-surface" id="calSurface"></div>
+  </div>
+  <div class="list-pane" id="listPane">
+    <button class="list-collapsed-btn" id="collapsedBtn" onclick="toggleList()">
+      <span style="font-size:14px;color:var(--text3)">&#8249;</span>
+      <span class="list-collapsed-label">Event list</span>
+    </button>
+    <div id="listInner">
+      <div class="list-top">
+        <div class="list-top-row">
+          <div class="list-title-row">
+            <div class="list-title">Event list</div>
+            <div class="sync-dot"></div>
+            <div class="sync-label">live sync</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="list-count" id="listCount"></div>
+            <button onclick="toggleList()" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:13px;padding:2px 8px;cursor:pointer;line-height:1.4">&#8250;</button>
+          </div>
+        </div>
+        <input class="search-input" id="searchInput" placeholder="Search..." oninput="renderList()">
+      </div>
+      <div class="list-cols">
+        <div class="col-h">Title</div>
+        <div class="col-h">Date</div>
+        <div class="col-h">Category</div>
+      </div>
+      <div class="list-rows" id="listRows"></div>
+      <div class="detail-panel" id="detPanel"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   SECTION 1: CATEGORIES
+════════════════════════════════════════════════════ */
+const CATS = [
+  { id:'conference',  label:'Conference',         bg:'#C0DD97', text:'#173404' },
+  { id:'training',    label:'Training',            bg:'#B5D4F4', text:'#042C53' },
+  { id:'mamh',        label:'MaMH',               bg:'#F4C0D1', text:'#4B1528' },
+  { id:'mhl_meeting', label:'MHL meeting',         bg:'#FAC775', text:'#412402' },
+  { id:'mentoring',   label:'Mentoring',           bg:'#CECBF6', text:'#26215C' },
+  { id:'ojt',         label:'On-the-job training', bg:'#9FE1CB', text:'#04342C' },
+];
+
+/* ════════════════════════════════════════════════════
+   SECTION 2: COLUMN CONFIG
+   calendarField:true  → shown on calendar chips
+   calendarField:false → detail panel only
+   Add extra columns here e.g.:
+   { key:'owner', label:'Owner', calendarField:false }
+════════════════════════════════════════════════════ */
+const COLUMNS = [
+  { key:'title',    label:'Title',    calendarField:true },
+  { key:'date',     label:'Date',     calendarField:true },
+  { key:'cat',      label:'Category', calendarField:true },
+  { key:'duration', label:'Duration', calendarField:true },
+];
+
+/* ════════════════════════════════════════════════════
+   SECTION 3: EVENT LIST
+   tbc:true  → shown as faded + (TBC) prefix
+   tbc:false / omitted → normal confirmed event
+   recurrence: months (from CSV Regularity column)
+════════════════════════════════════════════════════ */
+const EVENTS = [
+  // 2024
+  { id: 1,  title:'2024 Tides and Sea Level Working Group - March Port Adelaide', cat:'conference', date:'2024-03-01', duration:'1 day', recurrence:6 },
+  { id: 2,  title:'2024 MaMH Water Monitoring Community of Practice',              cat:'mamh',       date:'2024-04-06', duration:'1 day', recurrence:6 },
+  { id: 3,  title:'2024 Ozwater Conference',                                       cat:'conference', date:'2024-04-30', duration:'3 days', recurrence:12 },
+  { id: 4,  title:'2024 Maritime & Coastal Infrastructure Forum',                  cat:'conference', date:'2024-09-27', duration:'1 day' },
+  { id: 5,  title:'2024 MaMH Water Monitoring Community of Practice',              cat:'mamh',       date:'2024-11-29', duration:'1 day', recurrence:6 },
+  // 2025
+  { id: 6,  title:'2024 Swim/rescue Assessment',                                   cat:'training',   date:'2025-01-29', duration:'less than 1 day', recurrence:24 },
+  { id: 8,  title:'Project Management Training - PM1 New Project Commission',      cat:'training',   date:'2025-03-28', duration:'less than 1 day' },
+  { id: 7,  title:'2025 MaMH Climate for water modelling CoP',                    cat:'mamh',       date:'2025-04-07', duration:'1 day' },
+  { id: 9,  title:'2025 Country Surveyors Association',                            cat:'conference', date:'2025-04-04', duration:'1 day' },
+  { id:10,  title:'2025 Tides and Sea Level Working Group',                        cat:'conference', date:'2025-05-01', duration:'1 day', recurrence:6 },
+  { id:11,  title:'2025 Australian Hydrographers Association Conference',           cat:'conference', date:'2025-05-12', duration:'3 days', recurrence:24 },
+  { id:12,  title:'2025 Floodplain Management Australia Conference',               cat:'conference', date:'2025-05-13', duration:'4 days', recurrence:12 },
+  { id:13,  title:'Project Management Training - PM3 Project Variation',           cat:'training',   date:'2025-05-13', duration:'less than 1 day' },
+  { id:14,  title:'2025 COPEP Online Seminar',                                     cat:'conference', date:'2025-05-19', duration:'less than 1 day' },
+  { id:15,  title:'WHS Contractor Management Training',                            cat:'training',   date:'2025-06-02', duration:'less than 1 day' },
+  { id:16,  title:'2025 Evacuation and Fire Warden Training',                      cat:'training',   date:'2025-07-29', duration:'less than 1 day', recurrence:12 },
+  { id:17,  title:'2025 MaMH Water Monitoring Community of Practice',              cat:'mamh',       date:'2025-08-04', duration:'1 day', recurrence:6 },
+  { id:18,  title:'2025 Australasian Coasts & Ports Conference',                   cat:'conference', date:'2025-08-18', duration:'4 days', recurrence:24 },
+  { id:19,  title:'2025 First Aid Training Course',                                cat:'training',   date:'2025-08-18', duration:'less than 1 day' },
+  { id:20,  title:'2025 MaMH Water Monitoring Community of Practice',              cat:'mamh',       date:'2025-10-13', duration:'1 day', recurrence:6 },
+  { id:21,  title:'2025 MaMH Climate & water modelling Community of Practice',     cat:'mamh',       date:'2025-10-16', duration:'1 day' },
+  { id:22,  title:'2025 NSW Coastal Conference',                                   cat:'conference', date:'2025-11-05', duration:'3 days' },
+  { id:23,  title:'2025 MaMH Forum',                                               cat:'mamh',       date:'2025-11-12', duration:'2 days', recurrence:12 },
+  { id:24,  title:'Annual Hydrometrics and Water Information team meeting',         cat:'mhl_meeting',date:'2025-12-03', duration:'1 day', recurrence:12 },
+  { id:25,  title:'2025 Fire Extinguisher Training',                               cat:'training',   date:'2025-12-03', duration:'less than 1 day' },
+  // 2026
+  { id:26,  title:'2026 First Aid Training Course',                                cat:'training',   date:'2026-04-10', duration:'less than 1 day' },
+  { id:27,  title:'2026 MaMH water modelling Community of Practice',               cat:'mamh',       date:'2026-04-12', duration:'1 day', recurrence:6 },
+  { id:28,  title:'2026 MaMH Water Monitoring Community of Practice',              cat:'mamh',       date:'2026-04-20', duration:'1 day', recurrence:6 },
+  { id:29,  title:'2026 Floodplain Management Australia Conference',               cat:'conference', date:'2026-04-21', duration:'4 days', recurrence:12 },
+  { id:30,  title:'2026 MaMH Climate for water modelling CoP',                    cat:'mamh',       date:'2026-05-26', duration:'1 day', recurrence:6 },
+  { id:31,  title:'2026 Ozwater Conference',                                       cat:'conference', date:'2026-05-26', duration:'3 days', recurrence:12 },
+  { id:32,  title:'2026 Performance Development Plan review',                      cat:'mentoring',  date:'2026-06-30', duration:'', recurrence:12 },
+  { id:33,  title:'2027 Performance Development Plan setup',                       cat:'mentoring',  date:'2026-07-31', duration:'', recurrence:12 },
+  { id:34,  title:'2026 MaMH combined Monitoring and Modelling',                   cat:'mamh',       date:'2026-08-05', duration:'1 day', recurrence:12 },
+  { id:35,  title:'2026 NSW Australian Water Association State Conference',        cat:'conference', date:'2026-08-17', duration:'3 days' },
+  { id:36,  title:'2026 PIANC APAC',                                               cat:'conference', date:'2026-08-25', duration:'3 days' },
+  { id:37,  title:'2026 Local Government NSW Water Management Conference',         cat:'conference', date:'2026-09-02', duration:'3 days' },
+  { id:38,  title:'2026 Australian National Committee on Large Dams Conference',   cat:'conference', date:'2026-10-26', duration:'3 days' },
+  { id:45,  title:'2026 Annual Engineering Teams Meeting',                         cat:'mhl_meeting',date:'2026-11-01', duration:'1 day', tbc:true },
+  { id:39,  title:'NSW Coastal Conference',                                        cat:'conference', date:'2026-11-04', duration:'3 days' },
+  { id:43,  title:'2027 Performance Development Plan mid-year review',             cat:'mentoring',  date:'2026-12-31', duration:'', recurrence:12 },
+  // 2027
+  { id:40,  title:'2027 Ozwater Conference',                                       cat:'conference', date:'2027-05-04', duration:'3 days', recurrence:12 },
+  { id:41,  title:'2027 Performance Development Plan review',                      cat:'mentoring',  date:'2027-06-30', duration:'', recurrence:12 },
+  { id:42,  title:'2028 Performance Development Plan setup',                       cat:'mentoring',  date:'2027-07-31', duration:'', recurrence:12 },
+  { id:46,  title:'2027 MaMH Water Modelling CoP',                                cat:'mamh',       date:'2027-04-01', duration:'1 day', tbc:true },
+  { id:47,  title:'2027 MaMH Water Monitoring CoP',                               cat:'mamh',       date:'2027-04-01', duration:'1 day', tbc:true },
+  { id:48,  title:'2027 MaMH Forum',                                               cat:'mamh',       date:'2027-11-01', duration:'2 days', tbc:true },
+  { id:49,  title:'2027 Annual Hydrometrics & Water Information team meeting',     cat:'mhl_meeting',date:'2027-11-01', duration:'1 day', tbc:true },
+  { id:50,  title:'2027 Annual Engineering Teams Meeting',                         cat:'mhl_meeting',date:'2027-11-01', duration:'1 day', tbc:true },
+  { id:44,  title:'2028 Performance Development Plan mid-year review',             cat:'mentoring',  date:'2027-12-31', duration:'', recurrence:12 },
+];
+/* ════════════════════════════════════════════════════
+   END CONFIG
+════════════════════════════════════════════════════ */
+
+const catMap = {};
+CATS.forEach(c => catMap[c.id] = c);
+const MS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MN  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const now = new Date();
+EVENTS.forEach(e => { const p=e.date.split('-'); e.dateObj=new Date(+p[0],+p[1]-1,+p[2]);  });
+
+let curDate  = new Date(now);
+let view     = 'year';
+let activeF  = new Set(CATS.map(c => c.id));
+let selId    = null;
+
+const detailCols = COLUMNS.filter(c => !c.calendarField && c.key!=='title' && c.key!=='date' && c.key!=='cat' && c.key!=='duration');
+
+function fmt(d){ return MS[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear(); }
+function fmtISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isSame(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+
+
+function stripYear(t){ return t.replace(/^\d{4}\s+/, ''); }
+function addMonths(d, m){
+  const r=new Date(d); r.setMonth(r.getMonth()+m); return r;
+}
+function fmtISO(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function generateProjected(){
+  const projected=[], seen=new Set(EVENTS.map(e=>e.title+'|'+e.date));
+  const stripYearStr=t=>t.replace(/^\d{4}\s+/,'').trim().toLowerCase();
+  const baseCoreTitles=EVENTS.map(e=>({core:stripYearStr(e.title), dateObj:e.dateObj}));
+  let pid=10000;
+  EVENTS.forEach(base=>{
+    const months=base.recurrence||0;
+    if(!months) return;
+    const next=addMonths(base.dateObj,months);
+    if(next<=now) return;
+    const dateStr=fmtISO(next);
+    const key=base.title+'|'+dateStr;
+    if(seen.has(key)) return;
+    const coreNext=stripYearStr(base.title);
+    const tooClose=baseCoreTitles.some(b=>{
+      if(b.core!==coreNext) return false;
+      return Math.abs(next-b.dateObj) <= 31*24*60*60*1000;
+    });
+    if(tooClose) return;
+    seen.add(key);
+    projected.push({
+      id:pid++, title:base.title, cat:base.cat,
+      date:dateStr, dateObj:new Date(next),
+      duration:base.duration||'', tbc:true,
+    });
+  });
+  return projected;
+}
+function allEvents(){ return [...EVENTS, ...generateProjected()]; }
+
+function filtered(){ return allEvents().filter(e => activeF.has(e.cat)); }
+function searched(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  return filtered().filter(e => !q||e.title.toLowerCase().includes(q)||e.cat.includes(q));
+}
+
+/* ── FILTERS ── */
+function buildFilters(){
+  document.querySelectorAll('.fbtn:not(#fall)').forEach(b=>b.remove());
+  CATS.forEach(c=>{
+    const on=activeF.has(c.id);
+    const b=document.createElement('button');
+    b.className='fbtn'+(on?' on':'');
+    b.textContent=c.label;
+    if(on){b.style.borderColor=c.bg;b.style.background=c.bg+'44';b.style.color=c.text;}
+    b.onclick=()=>{
+      if(activeF.has(c.id)){activeF.delete(c.id);b.classList.remove('on');b.style.cssText='';}
+      else{activeF.add(c.id);b.classList.add('on');b.style.borderColor=c.bg;b.style.background=c.bg+'44';b.style.color=c.text;}
+      render();
+    };
+    document.querySelector('.filter-row').appendChild(b);
+  });
+}
+function toggleAll(){
+  if(activeF.size===CATS.length) activeF.clear();
+  else CATS.forEach(c=>activeF.add(c.id));
+  buildFilters(); render();
+}
+function buildLegend(){
+  document.getElementById('legend').innerHTML = CATS.map(c=>
+    `<div class="leg-item"><div class="leg-dot" style="background:${c.bg}"></div>${c.label}</div>`
+  ).join('');
+}
+
+/* ── CHIP ── */
+function chip(e){
+  const c=catMap[e.cat]; if(!c) return '';
+  const tbc=e.tbc;
+  const label=tbc?'<span class="tbc-label">(TBC)</span>':'';
+  const cls='ev-chip'+(selId===e.id?' hl':'')+(tbc?' tbc-chip':'');
+  return `<span class="${cls}" id="chip-${e.id}" style="background:${c.bg};color:${c.text}" onclick="selectEvent(${e.id})">${label}${stripYear(e.title)}</span>`;
+}
+
+/* ── NAVIGATE ── */
+function setView(v,btn){
+  view=v;
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active'); render();
+}
+function navPrev(){
+  if(view==='year'||view==='category') curDate.setFullYear(curDate.getFullYear()-1);
+  else if(view==='month') curDate.setMonth(curDate.getMonth()-1);
+  else curDate.setDate(curDate.getDate()-7);
+  render();
+}
+function navNext(){
+  if(view==='year'||view==='category') curDate.setFullYear(curDate.getFullYear()+1);
+  else if(view==='month') curDate.setMonth(curDate.getMonth()+1);
+  else curDate.setDate(curDate.getDate()+7);
+  render();
+}
+function goToday(){ curDate=new Date(now); render(); }
+
+/* ── PARSE DAYS ── */
+function parseDays(dur){
+  if(!dur) return 1;
+  const s=dur.toLowerCase();
+  if(s.includes('less')||s.includes('half')) return 1;
+  const m=s.match(/(\d+)/); return m?Math.max(1,parseInt(m[1])):1;
+}
+
+/* ── YEAR VIEW ── */
+function buildYear(){
+  const yr=curDate.getFullYear();
+  const evs=filtered().filter(e=>e.dateObj.getFullYear()===yr);
+  let h='';
+  for(let m=0;m<12;m++){
+    const me=evs.filter(e=>e.dateObj.getMonth()===m);
+    h+=`<div class="year-row"><div class="yr-ml">${MS[m]}</div><div class="yr-lane">${
+      me.map(e=>chip(e)).join('')||'<span style="font-size:10px;color:var(--text3);padding:7px 0;display:block">—</span>'
+    }</div></div>`;
+  }
+  return h||'<div class="empty">No events</div>';
+}
+
+/* ── MONTH VIEW ── */
+function buildMonth(){
+  const yr=curDate.getFullYear(), mo=curDate.getMonth();
+  const first=new Date(yr,mo,1).getDay();
+  const days=new Date(yr,mo+1,0).getDate();
+  const prev=new Date(yr,mo,0).getDate();
+  const evs=filtered().filter(e=>e.dateObj.getFullYear()===yr&&e.dateObj.getMonth()===mo);
+  const totalRows=Math.ceil((first+days)/7);
+  const trackH=18, baseH=28;
+
+  // assign span tracks
+  const spanEvs=evs.map(e=>{
+    const startCell=first+e.dateObj.getDate()-1;
+    const dur=parseDays(e.duration);
+    const maxSpan=days-e.dateObj.getDate()+1;
+    const rawSpan=Math.min(dur,maxSpan);
+    const colStart=startCell%7;
+    const spanInRow=Math.min(rawSpan,7-colStart);
+    return {e,startCell,colStart,spanInRow,rawSpan,row:Math.floor(startCell/7)};
+  });
+  const trackOcc={};
+  spanEvs.forEach(s=>{
+    let t=0;
+    while(true){
+      let ok=true;
+      for(let c=s.colStart;c<s.colStart+s.spanInRow;c++) if(trackOcc[s.row+'-'+t+'-'+c]){ok=false;break;}
+      if(ok)break; t++;
+    }
+    for(let c=s.colStart;c<s.colStart+s.spanInRow;c++) trackOcc[s.row+'-'+t+'-'+c]=true;
+    s.track=t;
+  });
+
+  const cellData=[];
+  for(let i=0;i<first;i++) cellData.push({d:prev-first+1+i,other:true,today:false});
+  for(let d=1;d<=days;d++) cellData.push({d,other:false,today:d===now.getDate()&&mo===now.getMonth()&&yr===now.getFullYear()});
+  const rem=(first+days)%7===0?0:7-(first+days)%7;
+  for(let i=1;i<=rem;i++) cellData.push({d:i,other:true,today:false});
+
+  let h='<div class="dow-row">'+DS.map(d=>`<div class="dow">${d}</div>`).join('')+'</div>';
+
+  for(let row=0;row<totalRows;row++){
+    const rowSpans=spanEvs.filter(s=>s.row===row);
+    const maxT=rowSpans.length?Math.max(...rowSpans.map(s=>s.track)):0;
+    const rowH=baseH+(maxT+1)*trackH+4;
+    h+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);position:relative;">`;
+    for(let col=0;col<7;col++){
+      const ci=row*7+col; if(ci>=cellData.length) break;
+      const cell=cellData[ci];
+      h+=`<div class="day-cell${cell.other?' other':''}" style="min-height:${rowH}px;">`;
+      h+=`<div class="day-num${cell.today?' today':''}">${cell.d}</div></div>`;
+    }
+    rowSpans.forEach(s=>{
+      const c=catMap[s.e.cat]; if(!c) return;
+      const hl=selId===s.e.id?' hl':'';
+      const tbc=s.e.tbc;
+      const tbcCls=tbc?' tbc-chip':'';
+      const tbcLabel=tbc?'(TBC) ':'';
+      const top=baseH+s.track*trackH;
+      const lp=s.colStart/7*100, wp=s.spanInRow/7*100;
+      const durLabel=s.rawSpan>1?` <span style="opacity:.6;font-size:9px">(${s.rawSpan}d)</span>`:'';
+      h+=`<div class="ev-bar${hl}${tbcCls}" id="chip-${s.e.id}"
+        style="top:${top}px;left:calc(${lp}% + 2px);width:calc(${wp}% - 4px);height:${trackH-2}px;
+               background:${c.bg};color:${c.text};line-height:${trackH-2}px;"
+        onclick="selectEvent(${s.e.id})" title="${s.e.title}">
+        ${tbcLabel}${s.e.title}${durLabel}</div>`;
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+/* ── WEEK VIEW ── */
+function weekStart(d){ const s=new Date(d); s.setDate(d.getDate()-d.getDay()); s.setHours(0,0,0,0); return s; }
+
+function buildWeek(){
+  const ws=weekStart(curDate);
+  const days=[];
+  for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(ws.getDate()+i);days.push(d);}
+  const evs=filtered().filter(e=>days.some(d=>isSame(d,e.dateObj)));
+  const multiDay=[], singleDay=[];
+  evs.forEach(e=>{ parseDays(e.duration)>=2?multiDay.push(e):singleDay.push(e); });
+
+  let h='<div class="week-wrap"><div class="wk-header"><div class="wk-col-label"></div>';
+  days.forEach(d=>{
+    const isT=isSame(d,now);
+    h+=`<div class="wk-head${isT?' tc':''}">${DS[d.getDay()]}<br><span style="font-size:14px;font-weight:${isT?600:400}">${d.getDate()}</span></div>`;
+  });
+  h+='</div>';
+
+  // multi-day bars
+  const trkOcc={};
+  const bars=multiDay.map(e=>{
+    const sc=days.findIndex(d=>isSame(d,e.dateObj)); if(sc<0) return null;
+    const span=Math.min(parseDays(e.duration),7-sc);
+    let t=0;
+    while(true){
+      let ok=true;
+      for(let c=sc;c<sc+span;c++) if(trkOcc[t+'-'+c]){ok=false;break;}
+      if(ok)break; t++;
+    }
+    for(let c=sc;c<sc+span;c++) trkOcc[t+'-'+c]=true;
+    return {e,sc,span,track:t};
+  }).filter(Boolean);
+
+  const maxT=bars.length?Math.max(...bars.map(b=>b.track)):0;
+  const trackH=22;
+  if(bars.length){
+    const spanH=(maxT+1)*trackH+6;
+    h+=`<div style="display:grid;grid-template-columns:48px repeat(7,1fr);min-width:500px;position:relative;height:${spanH}px;border-bottom:1px solid var(--border);">`;
+    h+='<div style="border-right:1px solid var(--border)"></div>';
+    days.forEach(()=>h+='<div style="border-right:1px solid var(--border)"></div>');
+    bars.forEach(b=>{
+      const c=catMap[b.e.cat]; if(!c) return;
+      const hl=selId===b.e.id?' hl':'';
+      const tbc=b.e.tbc;
+      const tbcCls=tbc?' tbc-chip':'';
+      const tbcLabel=tbc?'(TBC) ':'';
+      const lf=b.sc/7, wf=b.span/7;
+      const dur=parseDays(b.e.duration);
+      h+=`<div class="wk-span-bar${hl}${tbcCls}" id="chip-${b.e.id}"
+        style="top:${b.track*trackH+3}px;left:calc(48px + (100% - 48px)*${lf});
+               width:calc((100% - 48px)*${wf} - 4px);height:${trackH-4}px;
+               background:${c.bg};color:${c.text};"
+        onclick="selectEvent(${b.e.id})">
+        ${tbcLabel}${stripYear(b.e.title)}<span style="opacity:.6;font-size:9px;margin-left:4px">${dur}d</span></div>`;
+    });
+    h+='</div>';
+  }
+
+  h+='<div class="wk-body"><div class="wk-col-label"></div>';
+  days.forEach(d=>{
+    const de=singleDay.filter(e=>isSame(e.dateObj,d));
+    h+=`<div class="wk-col">${de.map(e=>{
+      const c=catMap[e.cat]; if(!c) return '';
+      const hl=selId===e.id?' hl':'';
+      const tbc=e.tbc;
+      const tbcCls=tbc?' tbc-chip':'';
+      const tbcLabel=tbc?'<span class="tbc-label">(TBC)</span>':'';
+      return `<span class="wk-ev${hl}${tbcCls}" id="chip-${e.id}" style="background:${c.bg};color:${c.text}" onclick="selectEvent(${e.id})">${tbcLabel}${stripYear(e.title)}</span>`;
+    }).join('')}</div>`;
+  });
+  return h+'</div></div>';
+}
+
+/* ── CATEGORY VIEW ── */
+function buildCategory(){
+  const yr=curDate.getFullYear();
+  const evs=filtered().filter(e=>e.dateObj.getFullYear()===yr);
+  let h='';
+  CATS.filter(c=>activeF.has(c.id)).forEach(c=>{
+    const ce=evs.filter(e=>e.cat===c.id).sort((a,b)=>a.dateObj-b.dateObj);
+    if(!ce.length) return;
+    h+=`<div class="cat-sec"><div class="cat-hdr"><div class="cat-dot" style="background:${c.bg}"></div>${c.label}<span class="cat-count">(${ce.length})</span></div>
+    <div class="cat-evs">${ce.map(e=>{
+      const tbc=e.tbc;
+      const tbcCls=tbc?' tbc-chip':'';
+      const tbcLabel=tbc?'<span class="tbc-label">(TBC)</span> ':'';
+      const hl=selId===e.id?' hl':'';
+      return `<div class="cat-ev${tbcCls}${hl}" id="chip-${e.id}" onclick="selectEvent(${e.id})">
+        <span class="cat-d">${MS[e.dateObj.getMonth()]} ${e.dateObj.getDate()}</span>
+        <span class="cat-t">${tbcLabel}${stripYear(e.title)}</span>
+        <span class="cat-dur">${e.duration||''}</span>
+      </div>`;
+    }).join('')}</div></div>`;
+  });
+  return h||'<div class="empty">No events for this year</div>';
+}
+
+/* ── RENDER ── */
+function render(){
+  updateLabel();
+  const surf=document.getElementById('calSurface');
+  if(view==='year')      surf.innerHTML=buildYear();
+  else if(view==='month') surf.innerHTML=buildMonth();
+  else if(view==='week')  surf.innerHTML=buildWeek();
+  else                    surf.innerHTML=buildCategory();
+  renderList();
+  if(selId) highlightChips(selId);
+}
+function updateLabel(){
+  const el=document.getElementById('periodLabel');
+  if(view==='year'||view==='category') el.textContent=curDate.getFullYear();
+  else if(view==='month') el.textContent=MN[curDate.getMonth()]+' '+curDate.getFullYear();
+  else{
+    const ws=weekStart(curDate), we=new Date(ws); we.setDate(we.getDate()+6);
+    el.textContent=MS[ws.getMonth()]+' '+ws.getDate()+' – '+MS[we.getMonth()]+' '+we.getDate()+', '+ws.getFullYear();
+  }
+}
+
+/* ── LIST ── */
+function renderList(){
+  const evs=searched().sort((a,b)=>a.dateObj-b.dateObj);
+  document.getElementById('listCount').textContent=evs.length+' events';
+  document.getElementById('listRows').innerHTML=evs.map(e=>{
+    const c=catMap[e.cat]; if(!c) return '';
+    const tbc=e.tbc;
+    return `<div class="list-row${selId===e.id?' sel':''}" id="row-${e.id}" onclick="selectEvent(${e.id})" style="${tbc?'opacity:.5':''}">
+      <div class="lr-title">${tbc?'(TBC) ':''}${stripYear(e.title)}</div>
+      <div class="lr-date">${MS[e.dateObj.getMonth()]} ${e.dateObj.getDate()}, ${e.dateObj.getFullYear()}</div>
+      <span class="lr-badge" style="background:${c.bg};color:${c.text}">${c.label}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ── SELECT ── */
+function selectEvent(id){
+  selId=id;
+  const e=allEvents().find(ev=>ev.id===id);
+  const c=catMap[e.cat];
+  const extraRows=detailCols.map(col=>e[col.key]?`<div class="det-row"><span class="det-lbl">${col.label}</span><span class="det-val">${e[col.key]}</span></div>`:'').join('');
+  const tbcBadge=e.tbc?'<span style="font-size:10px;background:#f5f5f0;border:1px solid #ccc;border-radius:5px;padding:1px 7px;margin-left:6px;color:#888">TBC</span>':'';
+  document.getElementById('detPanel').innerHTML=`
+    <div class="det-top">
+      <div class="det-title">${stripYear(e.title)}${tbcBadge}</div>
+      <button class="det-close" onclick="closeDetail()">×</button>
+    </div>
+    <span class="det-badge" style="background:${c.bg};color:${c.text}">${c.label}</span>
+    <div class="det-row"><span class="det-lbl">date</span><span class="det-val">${fmt(e.dateObj)}</span></div>
+    <div class="det-row"><span class="det-lbl">duration</span><span class="det-val">${e.duration||'—'}</span></div>
+    ${extraRows}`;
+  document.getElementById('detPanel').classList.add('open');
+  highlightChips(id);
+  renderList();
+  const d=e.dateObj; let needRender=false;
+  if(view==='year'||view==='category'){ if(d.getFullYear()!==curDate.getFullYear()){curDate=new Date(d);needRender=true;} }
+  else if(view==='month'){ if(d.getFullYear()!==curDate.getFullYear()||d.getMonth()!==curDate.getMonth()){curDate=new Date(d);needRender=true;} }
+  else{ const ws=weekStart(curDate),we=new Date(ws);we.setDate(we.getDate()+6);if(d<ws||d>we){curDate=new Date(d);needRender=true;} }
+  if(needRender) render(); else highlightChips(id);
+  const row=document.getElementById('row-'+id);
+  if(row) row.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function highlightChips(id){
+  document.querySelectorAll('.ev-chip,.wk-ev,.cat-ev,.ev-bar,.wk-span-bar').forEach(el=>{
+    el.classList.remove('hl');
+    if(el.id==='chip-'+id) el.classList.add('hl');
+  });
+}
+function closeDetail(){
+  document.getElementById('detPanel').classList.remove('open');
+  selId=null;
+  document.querySelectorAll('.ev-chip,.wk-ev,.cat-ev,.ev-bar,.wk-span-bar').forEach(el=>el.classList.remove('hl'));
+  renderList();
+}
+
+/* ── TOGGLE LIST PANE ── */
+function toggleList(){
+  const pane=document.getElementById('listPane');
+  const inner=document.getElementById('listInner');
+  const btn=document.getElementById('collapsedBtn');
+  const app=document.getElementById('app');
+  const collapsed=pane.classList.toggle('collapsed');
+  if(collapsed){ app.style.gridTemplateColumns='1fr 36px'; inner.style.display='none'; btn.style.display='flex'; }
+  else{ app.style.gridTemplateColumns='1fr 360px'; inner.style.display='block'; btn.style.display='none'; }
+}
+
+/* ── CSV IMPORT ── */
+
+function showToast(msg,ok=true){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=ok?'#1a1a18':'#c0392b';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+function handleFile(file){
+  if(!file) return;
+  if(!file.name.endsWith('.csv')){ showToast('Only CSV files are supported.',false); return; }
+  const reader=new FileReader();
+  reader.onload=e=>parseCSV(e.target.result);
+  reader.readAsText(file,'UTF-8');
+}
+
+function splitCSVLine(line){
+  const r=[]; let cur='',inQ=false;
+  for(const ch of line){
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){r.push(cur);cur='';}
+    else{cur+=ch;}
+  }
+  r.push(cur); return r;
+}
+
+function parseAnyDate(s){
+  if(!s) return null;
+  s=s.trim();
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return new Date(+m[3],+m[1]-1,+m[2]);
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+
+function parseRegularity(r){
+  if(!r) return 0;
+  const s=r.toLowerCase().trim();
+  if(s.includes('ad-hoc')||s.includes('adhoc')) return 0;
+  if(s.includes('6-month')||s.includes('6 month')) return 6;
+  if(s.includes('3-month')||s.includes('quarter')) return 3;
+  if(s.includes('2 year')||s.includes('2-year')) return 24;
+  if(s.includes('year')||s.includes('annual')) return 12;
+  return 0;
+}
+
+function mapCategory(raw,title){
+  const r=raw.toLowerCase(), t=title.toLowerCase();
+  // Respect CSV category first
+  if(r.includes('training')) return 'training';
+  if(r.includes('conference')) return 'conference';
+  if(r.includes('mamh')) return 'mamh';
+  if(r.includes('meeting')) return 'mhl_meeting';
+  if(r.includes('mentoring')) return 'mentoring';
+  if(r.includes('ojt')) return 'ojt';
+  // Fallback to title-based
+  if(t.includes('training')||t.includes('whs')||t.includes('first aid')||t.includes('swim')||t.includes('evacuation')) return 'training';
+  if(t.includes('mamh')) return 'mamh';
+  return 'conference';
+}
+
+function parseCSV(text){
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){showToast('No data found.',false);return;}
+  const headers=splitCSVLine(lines[0]).map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const findCol=(...names)=>{ for(const n of names){const i=headers.findIndex(h=>h.includes(n));if(i>=0)return i;} return -1; };
+  const titleCol=findCol('title','name');
+  const dateCol =findCol('start','date');
+  const catCol  =findCol('category','cat');
+  const durCol  =findCol('duration');
+  const regCol  =findCol('regularity','recurrence');
+  if(titleCol<0||dateCol<0){showToast('Could not find Title or Date column.',false);return;}
+
+  const imported=[]; const seen=new Set();
+  let pid=1;
+  for(let i=1;i<lines.length;i++){
+    const cols=splitCSVLine(lines[i]).map(c=>c.trim().replace(/^"|"$/g,'').trim());
+    let title=cols[titleCol]||''; title=title.replace(/\s*\d\/2\b/g,'').replace(/\s+/g,' ').trim();
+    const rawDate=cols[dateCol]; if(!title||!rawDate) continue;
+    const dateObj=parseAnyDate(rawDate); if(!dateObj) continue;
+    const dateStr=fmtISO(dateObj);
+    const key=title+'|'+dateStr; if(seen.has(key)) continue; seen.add(key);
+    const catRaw=catCol>=0?(cols[catCol]||''):'';
+    const cat=mapCategory(catRaw,title);
+    const dur=durCol>=0?(cols[durCol]||''):'';
+    const rec=regCol>=0?parseRegularity(cols[regCol]||''):0;
+    const tbc=dateObj>new Date();
+    const ev={id:pid++,title,cat,date:dateStr,dateObj,duration:dur};
+    if(rec) ev.recurrence=rec;
+    if(tbc) ev.tbc=true;
+    imported.push(ev);
+  }
+  if(!imported.length){showToast('No events to load.',false);return;}
+  EVENTS.length=0; imported.forEach(e=>EVENTS.push(e));
+  selId=null;
+  document.getElementById('importLabel').textContent=`${EVENTS.length} events loaded`;
+  render();
+  showToast(`${EVENTS.length} events imported successfully.`);
+}
+
+/* ── BOOT ── */
+buildFilters();
+buildLegend();
+curDate = new Date();
+render();
+</script>
+</body>
+</html>
